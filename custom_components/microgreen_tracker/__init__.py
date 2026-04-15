@@ -8,7 +8,6 @@ from datetime import date
 
 import voluptuous as vol
 
-from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
@@ -39,16 +38,40 @@ RESET_SCHEMA = vol.Schema({})
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Register the Lovelace card JS as a static path and frontend resource."""
+    """Serve the Lovelace card JS as a static file."""
     www_path = str(
         pathlib.Path(__file__).parent / "www" / "microgreen-tracker-card.js"
     )
-    hass.http.register_static_path(
-        "/microgreen_tracker/microgreen-tracker-card.js",
-        www_path,
-        cache_headers=False,
-    )
-    add_extra_js_url(hass, "/microgreen_tracker/microgreen-tracker-card.js")
+    card_url = "/microgreen_tracker/microgreen-tracker-card.js"
+
+    # HA 2024.4+ uses async_register_static_paths + StaticPathConfig.
+    # Older versions use the synchronous register_static_path.
+    # Both are tried so the integration works across a wide HA version range.
+    try:
+        from homeassistant.components.http import StaticPathConfig  # noqa: PLC0415
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(card_url, www_path, False)]
+        )
+    except Exception:  # noqa: BLE001
+        try:
+            hass.http.register_static_path(card_url, www_path, cache_headers=False)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Could not register Lovelace card static path: %s", err)
+
+    # add_extra_js_url auto-registers the card as a Lovelace resource.
+    # It was removed in HA 2025.x; if unavailable the user must add the
+    # resource manually once via Settings → Dashboards → Resources.
+    try:
+        from homeassistant.components.frontend import add_extra_js_url  # noqa: PLC0415
+        add_extra_js_url(hass, card_url)
+    except Exception:  # noqa: BLE001
+        _LOGGER.info(
+            "Add the Microgreen Tracker card resource manually: "
+            "Settings → Dashboards → Resources → Add resource → "
+            "URL: %s  Type: JavaScript Module",
+            card_url,
+        )
+
     return True
 
 
