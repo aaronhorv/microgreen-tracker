@@ -1,0 +1,53 @@
+start_grow:
+  name: Növesztés indítása
+  description: Elindít egy új mikrozöld növesztési ciklust a megadott fajtával.
+  fields:
+    variety:
+      name: Fajta
+      description: A mikrozöld fajta neve.
+      required: true
+      selector:
+        select:
+          options:
+            - "Amaránt"
+            - "Bazsalikom"
+            - "Bíborhere"
+            - "Borágó"
+            - "Brokkoli"
+            - "Búza"
+            - "Cékla fajták"
+            - "Fodros kel"
+            - "Görögszéna"
+            - "Hagymafélék"
+            - "Karalábé"
+            - "Komatsuna"
+            - "Koriander"
+            - "Kukorica"
+            - "Mizuna"
+            - "Mustár, Fehér"
+            - "Mustár fajták"
+            - "Napraforgó"
+            - "Pak Choi"
+            - "Repce"
+            - "Retek fajták"
+            - "Rukkola"
+            - "Sarkantyúka"
+            - "Sárgadinnye"
+            - "Tatsoi"
+            - "Vajrépa"
+            - "Vöröskáposzta"
+            - "Zöldborsó"
+            - "Zsázsa"
+            - "Ázsia mix"
+            - "Pikáns mix"
+            - "Saláta mix"
+    start_date:
+      name: Kezdő dátum
+      description: Az ültetés dátuma (opcionális, alapértelmezett a mai nap).
+      required: false
+      selector:
+        date:
+
+reset:
+  name: Ciklus törlése
+  description: Törli az aktív mikrozöld növesztési ciklust.
