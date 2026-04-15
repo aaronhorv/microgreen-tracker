@@ -50,6 +50,11 @@ class _MicrogreenBaseSensor(CoordinatorEntity[MicrogreenTrackerCoordinator], Sen
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry.entry_id}_{sensor_key}"
         self._entry = entry
+        self._sensor_type = sensor_key
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"microgreen_sensor_type": self._sensor_type}
 
     @property
     def device_info(self) -> DeviceInfo:

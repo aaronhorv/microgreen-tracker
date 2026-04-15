@@ -28,7 +28,7 @@ ATTR_START_DATE = "start_date"
 SENSOR_STAGE = "stage"
 SENSOR_DAYS_REMAINING = "days_remaining"
 SENSOR_HARVEST_DATE = "harvest_date"
-SENSOR_VARIETY = "variety_name"
+SENSOR_VARIETY = "variety"
 
 # Variety catalogue: name → {dark_days, harvest_day}
 # dark_days  = days the tray spends covered / in darkness (sötétidő)

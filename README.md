@@ -22,22 +22,18 @@ Stage transitions happen automatically based on the planting date and variety ti
 
 ## Lovelace kártya / Lovelace Card
 
-Add the card resource to your dashboard resources:
+The card is installed and registered automatically — **no manual resource step needed**.
 
-```yaml
-url: /local/microgreen-tracker-card/microgreen-tracker-card.js
-type: module
-```
-
-Then add the card to a dashboard view:
+Add the card to any dashboard:
 
 ```yaml
 type: custom:microgreen-tracker-card
-entity_stage: sensor.microgreen_tracker_jelenlegi_szakasz
-entity_days_remaining: sensor.microgreen_tracker_hatralevo_napok
-entity_harvest_date: sensor.microgreen_tracker_varhato_aratas
-entity_variety: sensor.microgreen_tracker_aktiv_fajta
 ```
+
+Or search for **Microgreen Tracker** in the visual card picker (**Edit Dashboard → Add Card**).
+
+The card auto-discovers all integration entities via the `microgreen_sensor_type` attribute.
+No entity IDs are required. The card editor shows which entities were found.
 
 ## Szolgáltatások / Services
 

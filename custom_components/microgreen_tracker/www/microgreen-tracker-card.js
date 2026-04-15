@@ -1,24 +1,18 @@
 /**
  * Microgreen Tracker — Lovelace Custom Card
  *
- * Displays the active microgreen grow cycle with an inline variety
- * selector, stage badge, progress bar, and a proper card editor so the
- * card can be configured through the Home Assistant UI without YAML.
+ * Installed and registered automatically by the integration — no manual
+ * resource step needed.
  *
- * Minimum config (entity_stage is the only required field):
+ * Minimal YAML config (entities are auto-discovered):
  *   type: custom:microgreen-tracker-card
- *   entity_stage: sensor.microgreen_tracker_jelenlegi_szakasz
  *
- * Full config (auto-filled by the card editor):
- *   entity_stage: sensor.microgreen_tracker_jelenlegi_szakasz
- *   entity_days_remaining: sensor.microgreen_tracker_hatralevo_napok
- *   entity_harvest_date: sensor.microgreen_tracker_varhato_aratas
- *   entity_variety: sensor.microgreen_tracker_aktiv_fajta
- *   entity_variety_select: select.microgreen_tracker_fajta_kivalasztasa
+ * The card finds all integration entities by reading their
+ * `microgreen_sensor_type` state attribute, so no entity IDs are needed.
  */
 
 // ---------------------------------------------------------------------------
-// Variety list (mirrors const.py — update both if you add varieties)
+// Variety list (mirrors const.py VARIETIES)
 // ---------------------------------------------------------------------------
 const VARIETIES = [
   "Amaránt", "Bazsalikom", "Bíborhere", "Borágó", "Brokkoli",
@@ -34,10 +28,32 @@ const VARIETIES = [
 // Stage styling
 // ---------------------------------------------------------------------------
 const STAGE_STYLES = {
-  "sötétidő": { bg: "#1a1a2e", color: "#e0e0e0", icon: "🌑", label: "Sötétidő" },
-  "napozás":  { bg: "#f9c74f", color: "#1a1a1a", icon: "☀️",  label: "Napozás"  },
+  "sötétidő": { bg: "#1a1a2e", color: "#e0e0e0", icon: "🌑", label: "Sötétidő"       },
+  "napozás":  { bg: "#f9c74f", color: "#1a1a1a", icon: "☀️",  label: "Napozás"        },
   "aratás":   { bg: "#52b788", color: "#ffffff", icon: "✂️",  label: "Aratásra kész!" },
 };
+
+// ---------------------------------------------------------------------------
+// Auto-discovery helper — shared by card and editor
+// ---------------------------------------------------------------------------
+function discoverEntities(hass) {
+  /**
+   * Scans hass.states for entities that carry a `microgreen_sensor_type`
+   * attribute and returns a map:
+   *   { stage, days_remaining, harvest_date, variety, variety_select,
+   *     stage_entity_id, days_remaining_entity_id, ... }
+   * Values are the current state string, or null if unavailable.
+   */
+  const map = {};
+  for (const [entityId, stateObj] of Object.entries(hass.states)) {
+    const t = stateObj.attributes?.microgreen_sensor_type;
+    if (!t) continue;
+    const s = stateObj.state;
+    map[t] = (s === "unknown" || s === "unavailable") ? null : s;
+    map[`${t}_entity_id`] = entityId;
+  }
+  return map;
+}
 
 // ---------------------------------------------------------------------------
 // Shared CSS
@@ -46,7 +62,6 @@ const CARD_CSS = `
   :host { display: block; }
   ha-card { padding: 16px; box-sizing: border-box; }
 
-  /* header */
   .card-header {
     font-size: 1.05em; font-weight: 600;
     margin-bottom: 14px;
@@ -90,10 +105,7 @@ const CARD_CSS = `
     cursor: pointer; transition: opacity 0.15s;
   }
   .btn:hover { opacity: 0.85; }
-  .btn-primary {
-    background: var(--primary-color, #03a9f4);
-    color: #fff;
-  }
+  .btn-primary  { background: var(--primary-color, #03a9f4); color: #fff; }
   .btn-secondary {
     background: var(--secondary-background-color, #eee);
     color: var(--primary-text-color);
@@ -138,7 +150,14 @@ const CARD_CSS = `
     text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;
   }
   .info-val { font-size: 1em; font-weight: 600; }
-  .divider { border: none; border-top: 1px solid var(--divider-color, #e0e0e0); margin: 14px 0; }
+  .divider {
+    border: none; border-top: 1px solid var(--divider-color, #e0e0e0);
+    margin: 14px 0;
+  }
+  .no-integration {
+    color: var(--secondary-text-color); font-style: italic;
+    text-align: center; padding: 16px 0; font-size: 0.9em;
+  }
 `;
 
 // ---------------------------------------------------------------------------
@@ -148,34 +167,18 @@ class MicrogreenTrackerCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._showingForm = false; // toggle to show variety picker over active display
+    this._showingForm = false;
   }
 
   setConfig(config) {
-    if (!config.entity_stage) {
-      throw new Error("'entity_stage' is required in card config.");
-    }
-    this._config = config;
+    // No required fields — card is zero-config.
+    this._config = config || {};
     this._render();
   }
 
   set hass(hass) {
     this._hass = hass;
     this._render();
-  }
-
-  // ---- state helpers -------------------------------------------------------
-
-  _state(entityId) {
-    if (!entityId || !this._hass) return null;
-    const s = this._hass.states[entityId];
-    if (!s || s.state === "unknown" || s.state === "unavailable") return null;
-    return s.state;
-  }
-
-  _isActive() {
-    const s = this._state(this._config.entity_stage);
-    return s !== null;
   }
 
   // ---- service calls -------------------------------------------------------
@@ -197,44 +200,54 @@ class MicrogreenTrackerCard extends HTMLElement {
   // ---- render --------------------------------------------------------------
 
   _render() {
-    if (!this._config) return;
+    if (!this._config || !this._hass) return;
 
-    const active = this._isActive();
+    const e = discoverEntities(this._hass);
+    const active = e.stage !== null && e.stage !== undefined;
     const showForm = this._showingForm || !active;
 
     const shadow = this.shadowRoot;
     shadow.innerHTML = `<style>${CARD_CSS}</style><ha-card></ha-card>`;
     const card = shadow.querySelector("ha-card");
 
-    // Header
     const header = document.createElement("div");
     header.className = "card-header";
     header.textContent = "🌱 Mikrozöld nyomkövető";
     card.appendChild(header);
 
+    // If the integration isn't set up yet, show a hint
+    if (!e.stage_entity_id && !e.variety_select_entity_id) {
+      const hint = document.createElement("div");
+      hint.className = "no-integration";
+      hint.textContent =
+        "A Microgreen Tracker integráció nincs beállítva. " +
+        "Menj a Beállítások → Eszközök és Szolgáltatások menüpontra a telepítéshez.";
+      card.appendChild(hint);
+      return;
+    }
+
     if (showForm) {
-      card.appendChild(this._buildForm(active));
+      card.appendChild(this._buildForm(active, e));
     } else {
-      card.appendChild(this._buildActiveDisplay());
+      card.appendChild(this._buildActiveDisplay(e));
     }
   }
 
   // ---- variety picker form -------------------------------------------------
 
-  _buildForm(hasActiveCycle) {
+  _buildForm(hasActiveCycle, e) {
     const frag = document.createDocumentFragment();
 
-    // Variety dropdown
+    // Variety dropdown label
     const lbl = document.createElement("div");
     lbl.className = "form-label";
     lbl.textContent = "Mikrozöld fajta";
     frag.appendChild(lbl);
 
+    // Variety select
     const sel = document.createElement("select");
     sel.className = "variety-select";
-    // Pre-select the currently active variety if there is one
-    const currentVariety = this._state(this._config.entity_variety_select)
-      || this._state(this._config.entity_variety);
+    const currentVariety = e.variety_select || e.variety;
     VARIETIES.forEach((v) => {
       const opt = document.createElement("option");
       opt.value = v;
@@ -244,7 +257,7 @@ class MicrogreenTrackerCard extends HTMLElement {
     });
     frag.appendChild(sel);
 
-    // Optional start date row
+    // Optional start date
     const dateRow = document.createElement("div");
     dateRow.className = "date-row";
     const dateLbl = document.createElement("label");
@@ -252,7 +265,7 @@ class MicrogreenTrackerCard extends HTMLElement {
     const dateInput = document.createElement("input");
     dateInput.type = "date";
     dateInput.className = "date-input";
-    dateInput.value = new Date().toISOString().slice(0, 10); // default today
+    dateInput.value = new Date().toISOString().slice(0, 10);
     dateRow.appendChild(dateLbl);
     dateRow.appendChild(dateInput);
     frag.appendChild(dateRow);
@@ -272,7 +285,6 @@ class MicrogreenTrackerCard extends HTMLElement {
     btnRow.appendChild(startBtn);
 
     if (hasActiveCycle) {
-      // "Cancel" just goes back to the active display without resetting
       const cancelBtn = document.createElement("button");
       cancelBtn.className = "btn btn-secondary";
       cancelBtn.textContent = "Mégse";
@@ -289,15 +301,14 @@ class MicrogreenTrackerCard extends HTMLElement {
 
   // ---- active cycle display ------------------------------------------------
 
-  _buildActiveDisplay() {
+  _buildActiveDisplay(e) {
     const frag = document.createDocumentFragment();
 
-    const stage    = this._state(this._config.entity_stage);
-    const daysLeft = this._state(this._config.entity_days_remaining);
-    const harvest  = this._state(this._config.entity_harvest_date);
-    const variety  = this._state(this._config.entity_variety);
-
-    const style = STAGE_STYLES[stage] || STAGE_STYLES["napozás"];
+    const stage    = e.stage;
+    const daysLeft = e.days_remaining;
+    const harvest  = e.harvest_date;
+    const variety  = e.variety;
+    const style    = STAGE_STYLES[stage] || STAGE_STYLES["napozás"];
 
     // Variety name
     if (variety) {
@@ -317,7 +328,7 @@ class MicrogreenTrackerCard extends HTMLElement {
     badgeRow.appendChild(badge);
     frag.appendChild(badgeRow);
 
-    // Progress bar (rough: sötétidő=20%, napozás=60%, aratás=100%)
+    // Progress bar
     const pct = stage === "aratás" ? 100 : stage === "napozás" ? 60 : 20;
     const progressWrap = document.createElement("div");
     progressWrap.className = "progress-wrap";
@@ -379,69 +390,51 @@ class MicrogreenTrackerCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return {
-      entity_stage:          "sensor.microgreen_tracker_jelenlegi_szakasz",
-      entity_days_remaining: "sensor.microgreen_tracker_hatralevo_napok",
-      entity_harvest_date:   "sensor.microgreen_tracker_varhato_aratas",
-      entity_variety:        "sensor.microgreen_tracker_aktiv_fajta",
-      entity_variety_select: "select.microgreen_tracker_fajta_kivalasztasa",
-    };
+    return {};
   }
 }
 
 customElements.define("microgreen-tracker-card", MicrogreenTrackerCard);
 
 // ---------------------------------------------------------------------------
-// Card editor (shown in the HA "Edit card" drawer)
+// Card editor — shows auto-discovered entities (read-only, no inputs needed)
 // ---------------------------------------------------------------------------
 const EDITOR_CSS = `
-  .field { margin-bottom: 14px; }
-  label  { display: block; font-size: 0.85em; font-weight: 500; margin-bottom: 4px; }
-  input  {
-    width: 100%; box-sizing: border-box;
-    padding: 7px 10px;
-    border: 1px solid var(--divider-color, #ccc);
-    border-radius: 6px;
-    background: var(--card-background-color, #fff);
-    color: var(--primary-text-color);
-    font-size: 0.95em;
+  .title {
+    font-size: 0.85em; font-weight: 600; margin-bottom: 10px;
+    color: var(--secondary-text-color); text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
-  .hint { font-size: 0.75em; color: var(--secondary-text-color); margin-top: 2px; }
+  .entity-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--divider-color, #e0e0e0);
+    font-size: 0.85em; gap: 8px;
+  }
+  .entity-row:last-child { border-bottom: none; }
+  .entity-type { color: var(--secondary-text-color); white-space: nowrap; }
+  .entity-id   { font-family: monospace; color: var(--primary-text-color); word-break: break-all; }
+  .not-found   { color: var(--error-color, #c62828); font-style: italic; }
+  .hint {
+    margin-top: 12px; padding: 10px; border-radius: 6px;
+    background: var(--secondary-background-color, #f5f5f5);
+    font-size: 0.8em; color: var(--secondary-text-color); line-height: 1.4;
+  }
 `;
 
-const EDITOR_FIELDS = [
-  {
-    key: "entity_stage",
-    label: "Szakasz szenzor *",
-    hint: "pl. sensor.microgreen_tracker_jelenlegi_szakasz",
-  },
-  {
-    key: "entity_days_remaining",
-    label: "Hátralévő napok szenzor",
-    hint: "pl. sensor.microgreen_tracker_hatralevo_napok",
-  },
-  {
-    key: "entity_harvest_date",
-    label: "Aratás dátuma szenzor",
-    hint: "pl. sensor.microgreen_tracker_varhato_aratas",
-  },
-  {
-    key: "entity_variety",
-    label: "Aktív fajta szenzor",
-    hint: "pl. sensor.microgreen_tracker_aktiv_fajta",
-  },
-  {
-    key: "entity_variety_select",
-    label: "Fajta kiválasztása (select entitás)",
-    hint: "pl. select.microgreen_tracker_fajta_kivalasztasa",
-  },
+const DISCOVERY_KEYS = [
+  { key: "stage",           label: "Szakasz szenzor"    },
+  { key: "days_remaining",  label: "Hátralévő napok"    },
+  { key: "harvest_date",    label: "Aratás dátuma"      },
+  { key: "variety",         label: "Aktív fajta"        },
+  { key: "variety_select",  label: "Fajta kiválasztása" },
 ];
 
 class MicrogreenTrackerCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._config = {};
+    this._hass = null;
   }
 
   setConfig(config) {
@@ -449,42 +442,52 @@ class MicrogreenTrackerCardEditor extends HTMLElement {
     this._render();
   }
 
-  // hass is passed in but not needed for a plain text-field editor
-  set hass(_hass) {}
-
-  _render() {
-    this.shadowRoot.innerHTML = `<style>${EDITOR_CSS}</style>`;
-    EDITOR_FIELDS.forEach(({ key, label, hint }) => {
-      const wrap = document.createElement("div");
-      wrap.className = "field";
-
-      const lbl = document.createElement("label");
-      lbl.textContent = label;
-      wrap.appendChild(lbl);
-
-      const input = document.createElement("input");
-      input.type = "text";
-      input.value = this._config[key] || "";
-      input.placeholder = hint;
-      input.dataset.key = key;
-      input.addEventListener("change", (e) => this._valueChanged(e));
-      wrap.appendChild(input);
-
-      const hintDiv = document.createElement("div");
-      hintDiv.className = "hint";
-      hintDiv.textContent = hint;
-      wrap.appendChild(hintDiv);
-
-      this.shadowRoot.appendChild(wrap);
-    });
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
   }
 
-  _valueChanged(e) {
-    const key = e.target.dataset.key;
-    this._config = { ...this._config, [key]: e.target.value.trim() };
-    this.dispatchEvent(
-      new CustomEvent("config-changed", { detail: { config: this._config } })
-    );
+  _render() {
+    if (!this._hass) return;
+    const found = discoverEntities(this._hass);
+    const shadow = this.shadowRoot;
+    shadow.innerHTML = `<style>${EDITOR_CSS}</style>`;
+
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = "Automatikusan felismert entitások";
+    shadow.appendChild(title);
+
+    DISCOVERY_KEYS.forEach(({ key, label }) => {
+      const row = document.createElement("div");
+      row.className = "entity-row";
+
+      const typeSpan = document.createElement("span");
+      typeSpan.className = "entity-type";
+      typeSpan.textContent = label;
+
+      const idSpan = document.createElement("span");
+      const entityId = found[`${key}_entity_id`];
+      if (entityId) {
+        idSpan.className = "entity-id";
+        idSpan.textContent = entityId;
+      } else {
+        idSpan.className = "not-found";
+        idSpan.textContent = "nem található";
+      }
+
+      row.appendChild(typeSpan);
+      row.appendChild(idSpan);
+      shadow.appendChild(row);
+    });
+
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent =
+      "Nincs szükség konfigurációra — a kártya automatikusan megtalálja " +
+      "a Microgreen Tracker entitásokat. Ha valamelyik entitás hiányzik, " +
+      "ellenőrizd, hogy az integráció be van-e állítva.";
+    shadow.appendChild(hint);
   }
 }
 
@@ -497,7 +500,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "microgreen-tracker-card",
   name: "Microgreen Tracker",
-  description: "Mikrozöld növesztési ciklus nyomkövetése",
+  description: "Mikrozöld növesztési ciklus nyomkövetése — konfiguráció nélkül",
   preview: true,
   documentationURL: "https://github.com/aaronhorv/microgreen-tracker",
 });

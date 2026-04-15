@@ -64,6 +64,10 @@ class MicrogreenVarietySelect(
             return self.coordinator.data["variety"]
         return None
 
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {"microgreen_sensor_type": "variety_select"}
+
     async def async_select_option(self, option: str) -> None:
         """Start a new grow cycle with the chosen variety from today."""
         await self.coordinator.async_start_grow(option, date.today())

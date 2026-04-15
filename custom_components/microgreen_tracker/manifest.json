@@ -8,7 +8,7 @@
   "codeowners": ["@aaronhorv"],
   "requirements": [],
   "dependencies": [],
-  "after_dependencies": ["persistent_notification"],
+  "after_dependencies": ["persistent_notification", "frontend"],
   "iot_class": "local_polling",
   "integration_type": "service",
   "homeassistant": "2024.8.0"

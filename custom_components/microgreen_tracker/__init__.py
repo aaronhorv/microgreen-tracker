@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import pathlib
 from datetime import date
 
 import voluptuous as vol
 
+from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
@@ -34,6 +36,20 @@ START_GROW_SCHEMA = vol.Schema(
 )
 
 RESET_SCHEMA = vol.Schema({})
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Register the Lovelace card JS as a static path and frontend resource."""
+    www_path = str(
+        pathlib.Path(__file__).parent / "www" / "microgreen-tracker-card.js"
+    )
+    hass.http.register_static_path(
+        "/microgreen_tracker/microgreen-tracker-card.js",
+        www_path,
+        cache_headers=False,
+    )
+    add_extra_js_url(hass, "/microgreen_tracker/microgreen-tracker-card.js")
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
