@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -121,9 +123,11 @@ class MicrogreenHarvestDateSensor(_MicrogreenBaseSensor):
         super().__init__(coordinator, entry, SENSOR_HARVEST_DATE)
 
     @property
-    def native_value(self) -> str | None:
+    def native_value(self) -> date | None:
         if self.coordinator.data:
-            return self.coordinator.data.get("harvest_date")
+            val = self.coordinator.data.get("harvest_date")
+            if val:
+                return date.fromisoformat(val)
         return None
 
 
