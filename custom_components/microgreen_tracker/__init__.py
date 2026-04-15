@@ -24,7 +24,7 @@ from .coordinator import MicrogreenTrackerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "select"]
 
 START_GROW_SCHEMA = vol.Schema(
     {

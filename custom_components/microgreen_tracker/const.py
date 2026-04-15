@@ -12,6 +12,7 @@ STAGE_ARATAS = "aratás"
 STAGES = [STAGE_SOTETSIDO, STAGE_NAPOZES, STAGE_ARATAS]
 
 # Config entry keys
+CONF_NOTIFY_ENABLED = "notify_enabled"
 CONF_NOTIFY_TARGET = "notify_target"
 DEFAULT_NOTIFY_TARGET = "persistent_notification"
 

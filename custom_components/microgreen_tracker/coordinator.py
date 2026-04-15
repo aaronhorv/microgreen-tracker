@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import (
     ATTR_START_DATE,
     ATTR_VARIETY,
+    CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_TARGET,
     DEFAULT_NOTIFY_TARGET,
     DOMAIN,
@@ -50,10 +51,12 @@ class MicrogreenTrackerCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(hours=1),
         )
         self._store: Store[dict] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        self._notify_target: str = config_entry.options.get(
-            CONF_NOTIFY_TARGET,
-            config_entry.data.get(CONF_NOTIFY_TARGET, DEFAULT_NOTIFY_TARGET),
-        )
+
+        def _cfg(key, default):
+            return config_entry.options.get(key, config_entry.data.get(key, default))
+
+        self._notify_enabled: bool = _cfg(CONF_NOTIFY_ENABLED, True)
+        self._notify_target: str = _cfg(CONF_NOTIFY_TARGET, DEFAULT_NOTIFY_TARGET)
         self.grow_data: dict = {}
 
     # ------------------------------------------------------------------
@@ -133,7 +136,9 @@ class MicrogreenTrackerCoordinator(DataUpdateCoordinator):
         days_elapsed: int,
         harvest_date: date,
     ) -> None:
-        """Send a Hungarian notification about the current stage."""
+        """Send a Hungarian notification about the current stage (if enabled)."""
+        if not self._notify_enabled:
+            return
         last_notified = self.grow_data.get("last_notified_stage")
         dark_days = VARIETIES[variety]["dark_days"]
 

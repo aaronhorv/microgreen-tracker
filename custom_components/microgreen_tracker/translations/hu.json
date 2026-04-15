@@ -3,14 +3,12 @@
     "step": {
       "user": {
         "title": "Microgreen Tracker beállítása",
-        "description": "Add meg az értesítési célpontot (pl. persistent_notification vagy mobile_app_telefonom).",
+        "description": "Az értesítések opcionálisak. Ha bekapcsolod, add meg az értesítési célpontot (pl. persistent_notification vagy mobile_app_telefonom).",
         "data": {
+          "notify_enabled": "Értesítések bekapcsolása",
           "notify_target": "Értesítési célpont"
         }
       }
-    },
-    "error": {
-      "invalid_notify_target": "Az értesítési célpont nem érhető el."
     },
     "abort": {
       "already_configured": "A Microgreen Tracker már be van állítva."
@@ -20,8 +18,9 @@
     "step": {
       "init": {
         "title": "Microgreen Tracker beállítások",
-        "description": "Módosítsd az értesítési célpontot.",
+        "description": "Az értesítések opcionálisak.",
         "data": {
+          "notify_enabled": "Értesítések bekapcsolása",
           "notify_target": "Értesítési célpont"
         }
       }
